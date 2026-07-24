@@ -1,0 +1,14 @@
+# Dependencies
+node_modules
+.venv
+dist
+
+# Model conversion intermediates
+extracted
+extracted-usda
+torres-usda.usdz
+*.usdz
+
+# Editor
+.DS_Store
+*.local
