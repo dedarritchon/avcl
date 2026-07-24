@@ -1,5 +1,11 @@
+import type { CSSProperties } from 'react'
 import { copy, type Locale } from '../lib/locale'
 import type { Theme } from '../lib/theme'
+import {
+  SCROLL_BEATS,
+  beatOpacity,
+  type ScrollBeatId,
+} from '../lib/scrollBeats'
 
 type Props = {
   progress: number
@@ -7,6 +13,8 @@ type Props = {
   onLocaleChange: (locale: Locale) => void
   theme: Theme
   onThemeChange: (theme: Theme) => void
+  /** False during automatic camera intro — hero appears when true */
+  revealed?: boolean
 }
 
 function IconMail() {
@@ -42,21 +50,28 @@ function IconWhatsApp() {
   )
 }
 
+function captionStyle(progress: number, id: ScrollBeatId): CSSProperties {
+  const opacity = beatOpacity(progress, id)
+  return {
+    opacity,
+    // Keep invisible captions out of the way for a11y / clicks
+    visibility: opacity < 0.04 ? 'hidden' : 'visible',
+  }
+}
+
 export function ScrollNarrative({
   progress,
   locale,
   onLocaleChange,
   theme,
   onThemeChange,
+  revealed = true,
 }: Props) {
   const t = copy[locale]
+  const finaleOpacity = beatOpacity(progress, 'finale')
 
   return (
-    <main className="narrative">
-      <div className="progress" aria-hidden>
-        <div className="progress__fill" style={{ transform: `scaleX(${progress})` }} />
-      </div>
-
+    <main className={`narrative${revealed ? ' is-revealed' : ''}`}>
       <div className="site-controls">
         <div className="lang-toggle" role="group" aria-label={t.langToggle}>
           <button
@@ -103,56 +118,93 @@ export function ScrollNarrative({
         </div>
       </div>
 
-      {t.sections.map((section) => (
-        <section key={section.id} className={`panel panel--${section.id}`} id={section.id}>
-          <div className="panel__inner">
-            <p className="panel__kicker">{section.kicker}</p>
-            {section.id === 'hero' ? (
-              <h1 className="panel__title">{section.title}</h1>
-            ) : (
-              <h2 className="panel__title">{section.title}</h2>
-            )}
-            <p className="panel__body">{section.body}</p>
-          </div>
-        </section>
-      ))}
+      {/* Scroll length only — camera + captions are driven by remapped progress */}
+      <div className="scroll-track" aria-hidden>
+        {SCROLL_BEATS.map((beat) => (
+          <section
+            key={beat.id}
+            id={beat.id}
+            className={`scroll-beat scroll-beat--${beat.id}`}
+          />
+        ))}
+      </div>
 
-      {/* Hold on the towers — contact sits in the sky above them */}
-      <section className="panel panel--finale" id="finale" aria-labelledby="finale-contact-title">
-        <div className="finale-contacts">
-          <h2 id="finale-contact-title" className="finale-contacts__title">
-            {t.contactTitle}
-          </h2>
-          <div className="finale-contacts__row">
-            <a
-              className="finale-contacts__btn"
-              href="mailto:agustin.varela.cl@gmail.com"
-              aria-label={t.contactEmail}
-              title={t.contactEmail}
+      {/* Fixed captions — soft mist CSS sits with the copy */}
+      <div className="captions">
+        {t.sections.map((section) => {
+          const id = section.id as ScrollBeatId
+          return (
+            <article
+              key={section.id}
+              className={`caption caption--${section.id}`}
+              style={captionStyle(progress, id)}
+              aria-hidden={beatOpacity(progress, id) < 0.08}
             >
-              <IconMail />
-            </a>
-            <a
-              className="finale-contacts__btn"
-              href="https://www.linkedin.com/in/avcl/"
-              target="_blank"
-              rel="noreferrer"
-              aria-label={t.contactLinkedIn}
-              title={t.contactLinkedIn}
-            >
-              <IconLinkedIn />
-            </a>
-            <a
-              className="finale-contacts__btn"
-              href="https://wa.me/56958442626"
-              aria-label={t.contactWhatsApp}
-              title={t.contactWhatsApp}
-            >
-              <IconWhatsApp />
-            </a>
+              <span className="caption-mist" aria-hidden>
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+                <span className="caption-mist__puff" />
+              </span>
+              <p className="panel__kicker">{section.kicker}</p>
+              {section.id === 'hero' ? (
+                <h1 className="panel__title">{section.title}</h1>
+              ) : (
+                <h2 className="panel__title">{section.title}</h2>
+              )}
+              <p className="panel__body">{section.body}</p>
+            </article>
+          )
+        })}
+
+        <div
+          className="caption caption--finale"
+          style={captionStyle(progress, 'finale')}
+          aria-hidden={finaleOpacity < 0.08}
+        >
+          <div
+            className="finale-contacts"
+            style={{ pointerEvents: finaleOpacity > 0.4 ? 'auto' : 'none' }}
+          >
+            <h2 id="finale-contact-title" className="finale-contacts__title">
+              {t.contactTitle}
+            </h2>
+            <div className="finale-contacts__row">
+              <a
+                className="finale-contacts__btn"
+                href="mailto:agustin.varela.cl@gmail.com"
+                aria-label={t.contactEmail}
+                title={t.contactEmail}
+              >
+                <IconMail />
+              </a>
+              <a
+                className="finale-contacts__btn"
+                href="https://www.linkedin.com/in/avcl/"
+                target="_blank"
+                rel="noreferrer"
+                aria-label={t.contactLinkedIn}
+                title={t.contactLinkedIn}
+              >
+                <IconLinkedIn />
+              </a>
+              <a
+                className="finale-contacts__btn"
+                href="https://wa.me/56958442626"
+                aria-label={t.contactWhatsApp}
+                title={t.contactWhatsApp}
+              >
+                <IconWhatsApp />
+              </a>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
     </main>
   )
 }

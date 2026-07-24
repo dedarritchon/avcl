@@ -10,6 +10,7 @@ export type QualitySettings = {
   environment: boolean
   forestTree: number
   forestGrass: number
+  birds: number
   antialias: boolean
   dprMax: number
   cameraFar: number
@@ -17,43 +18,46 @@ export type QualitySettings = {
 
 const TIERS: Record<QualityTier, Omit<QualitySettings, 'tier'>> = {
   high: {
-    cloudLimit: 110,
-    cloudMaxCount: 18,
-    cloudSegments: 12,
-    stars: 4200,
-    celestialLayers: 8,
+    cloudLimit: 100,
+    cloudMaxCount: 14,
+    cloudSegments: 10,
+    stars: 2200,
+    celestialLayers: 6,
     environment: true,
-    forestTree: 1,
-    forestGrass: 1,
+    forestTree: 0.85,
+    forestGrass: 0.7,
+    birds: 8,
     antialias: true,
-    dprMax: 1.25,
-    cameraFar: 8000,
+    dprMax: 1.5,
+    cameraFar: 6000,
   },
   medium: {
-    cloudLimit: 60,
-    cloudMaxCount: 10,
-    cloudSegments: 8,
-    stars: 1200,
+    cloudLimit: 48,
+    cloudMaxCount: 8,
+    cloudSegments: 7,
+    stars: 800,
     celestialLayers: 3,
     environment: true,
-    forestTree: 0.55,
-    forestGrass: 0.45,
+    forestTree: 0.45,
+    forestGrass: 0.3,
+    birds: 4,
     antialias: true,
     dprMax: 1,
-    cameraFar: 5000,
+    cameraFar: 4500,
   },
   low: {
-    cloudLimit: 30,
-    cloudMaxCount: 5,
-    cloudSegments: 6,
+    cloudLimit: 24,
+    cloudMaxCount: 4,
+    cloudSegments: 5,
     stars: 0,
     celestialLayers: 1,
     environment: false,
-    forestTree: 0.3,
-    forestGrass: 0.2,
+    forestTree: 0.22,
+    forestGrass: 0.12,
+    birds: 0,
     antialias: false,
     dprMax: 1,
-    cameraFar: 3500,
+    cameraFar: 3000,
   },
 }
 

@@ -1,6 +1,7 @@
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Billboard, Cloud, Clouds, Environment, Stars } from '@react-three/drei'
+import { requestAmbientInvalidate } from '../lib/ambientFrame'
 import * as THREE from 'three'
 import {
   FOG_COLOR,
@@ -18,11 +19,15 @@ const SUN_DISTANCE = 2800
 const SUN_POS = SUN_DIR.clone().multiplyScalar(SUN_DISTANCE)
 
 class CloudMaterial extends THREE.MeshLambertMaterial {
-  constructor() {
+  constructor(emissiveIntensity = 0.55) {
     super({
       transparent: true,
       depthWrite: false,
       fog: false,
+      // Keep volumes bright white even under cool sky lighting
+      color: new THREE.Color('#ffffff'),
+      emissive: new THREE.Color('#ffffff'),
+      emissiveIntensity,
     })
   }
 }
@@ -233,9 +238,10 @@ function FixedCelestial({ night, layers }: { night: boolean; layers: number }) {
 
 function StarField({ reducedMotion, count }: { reducedMotion: boolean; count: number }) {
   const group = useRef<THREE.Group>(null)
-  useFrame(({ camera, invalidate }) => {
+  useFrame(({ camera, clock, invalidate }) => {
     group.current?.position.copy(camera.position)
-    if (!reducedMotion && count > 0) invalidate()
+    // Twinkle only needs a low ambient rate — don't pin 60fps at night
+    if (!reducedMotion && count > 0) requestAmbientInvalidate(clock.elapsedTime, invalidate)
   })
   if (count <= 0) return null
   return (
@@ -247,7 +253,7 @@ function StarField({ reducedMotion, count }: { reducedMotion: boolean; count: nu
         factor={5.5}
         saturation={0.15}
         fade
-        speed={reducedMotion ? 0 : 0.25}
+        speed={reducedMotion ? 0 : 0.12}
       />
     </group>
   )
@@ -263,11 +269,11 @@ function Drift({
   reducedMotion: boolean
 }) {
   const ref = useRef<THREE.Group>(null)
-  useFrame((state, delta) => {
-    if (!ref.current || reducedMotion) return
+  useFrame(({ clock, invalidate }, delta) => {
+    if (!ref.current || reducedMotion || speed === 0) return
     ref.current.position.x += delta * speed
     if (ref.current.position.x > 1600) ref.current.position.x = -1600
-    state.invalidate()
+    requestAmbientInvalidate(clock.elapsedTime, invalidate)
   })
   return <group ref={ref}>{children}</group>
 }
@@ -281,7 +287,7 @@ type CloudDef = {
   smallestVolume: number
   opacity: number
   fade: number
-  colorKey: 'hi' | 'mid' | 'low' | 'warm'
+  colorKey: 'hi' | 'mid' | 'low' | 'warm' | 'mist'
   concentrate?: 'random' | 'inside' | 'outside'
   speed: number
   drift?: boolean
@@ -293,21 +299,26 @@ function SceneClouds({
   limit,
   maxCount,
   segmentsCap,
+  animateClouds,
 }: {
   reducedMotion: boolean
   night: boolean
   limit: number
   maxCount: number
   segmentsCap: number
+  /** Noise/wisp animation — expensive; keep off on low tier */
+  animateClouds: boolean
 }) {
-  const drift = reducedMotion ? 0 : night ? 0.08 : 0.2
+  const drift = reducedMotion || !animateClouds ? 0 : night ? 0.08 : 0.2
+  const wisp = (v: number) => (reducedMotion || !animateClouds ? 0 : v)
   const colors = {
-    hi: night ? '#2a3548' : '#fff8f0',
-    mid: night ? '#222c3c' : '#eef3f7',
-    low: night ? '#1c2534' : '#dbe6ee',
-    warm: night ? '#263244' : '#f5ebe0',
+    hi: night ? '#4a5a72' : '#ffffff',
+    mid: night ? '#3e4c64' : '#ffffff',
+    low: night ? '#354258' : '#ffffff',
+    warm: night ? '#44566e' : '#ffffff',
+    mist: night ? '#3a4860' : '#ffffff',
   }
-  const opacityScale = night ? 0.55 : 1
+  const opacityScale = night ? 0.62 : 1
 
   const defs: CloudDef[] = [
     {
@@ -317,11 +328,11 @@ function SceneClouds({
       position: [SUN_POS.x * 0.45, 860, SUN_POS.z * 0.45],
       volume: 32,
       smallestVolume: 7,
-      opacity: 0.4,
+      opacity: 0.52,
       fade: 120,
       colorKey: 'hi',
       concentrate: 'random',
-      speed: 0.01,
+      speed: wisp(0.01),
       drift: true,
     },
     {
@@ -331,11 +342,11 @@ function SceneClouds({
       position: [SUN_POS.x * 0.3 - 160, 820, SUN_POS.z * 0.4 + 100],
       volume: 24,
       smallestVolume: 5,
-      opacity: 0.32,
+      opacity: 0.42,
       fade: 110,
       colorKey: 'warm',
       concentrate: 'random',
-      speed: 0.01,
+      speed: wisp(0.01),
       drift: true,
     },
     {
@@ -345,11 +356,11 @@ function SceneClouds({
       position: [-200, 880, -1000],
       volume: 26,
       smallestVolume: 6,
-      opacity: 0.34,
+      opacity: 0.44,
       fade: 115,
       colorKey: 'mid',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.008,
+      speed: wisp(0.008),
     },
     {
       seed: 211,
@@ -358,11 +369,11 @@ function SceneClouds({
       position: [640, 900, -820],
       volume: 22,
       smallestVolume: 5,
-      opacity: 0.3,
+      opacity: 0.4,
       fade: 110,
       colorKey: 'mid',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.008,
+      speed: wisp(0.008),
     },
     {
       seed: 301,
@@ -371,7 +382,7 @@ function SceneClouds({
       position: [-1320, 180, 280],
       volume: 42,
       smallestVolume: 9,
-      opacity: 0.4,
+      opacity: 0.48,
       fade: 80,
       colorKey: 'mid',
       concentrate: 'random',
@@ -384,7 +395,7 @@ function SceneClouds({
       position: [-1280, 210, -160],
       volume: 34,
       smallestVolume: 7,
-      opacity: 0.34,
+      opacity: 0.42,
       fade: 75,
       colorKey: 'low',
       concentrate: 'random',
@@ -397,7 +408,7 @@ function SceneClouds({
       position: [100, 160, 760],
       volume: 38,
       smallestVolume: 8,
-      opacity: 0.36,
+      opacity: 0.44,
       fade: 75,
       colorKey: 'mid',
       concentrate: 'random',
@@ -410,7 +421,7 @@ function SceneClouds({
       position: [700, 190, 740],
       volume: 30,
       smallestVolume: 6,
-      opacity: 0.32,
+      opacity: 0.4,
       fade: 70,
       colorKey: 'low',
       concentrate: 'random',
@@ -423,7 +434,7 @@ function SceneClouds({
       position: [200, 190, -860],
       volume: 32,
       smallestVolume: 7,
-      opacity: 0.34,
+      opacity: 0.42,
       fade: 75,
       colorKey: 'mid',
       concentrate: 'random',
@@ -436,7 +447,7 @@ function SceneClouds({
       position: [1580, 170, -280],
       volume: 36,
       smallestVolume: 8,
-      opacity: 0.38,
+      opacity: 0.46,
       fade: 75,
       colorKey: 'mid',
       concentrate: 'random',
@@ -449,11 +460,11 @@ function SceneClouds({
       position: [-200, 190, 760],
       volume: 20,
       smallestVolume: 5,
-      opacity: 0.28,
+      opacity: 0.36,
       fade: 65,
       colorKey: 'low',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.01,
+      speed: wisp(0.01),
     },
     {
       seed: 411,
@@ -462,11 +473,11 @@ function SceneClouds({
       position: [580, 185, 680],
       volume: 16,
       smallestVolume: 4,
-      opacity: 0.24,
+      opacity: 0.32,
       fade: 60,
       colorKey: 'low',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.012,
+      speed: wisp(0.012),
     },
     {
       seed: 420,
@@ -475,11 +486,11 @@ function SceneClouds({
       position: [480, 180, 20],
       volume: 18,
       smallestVolume: 4,
-      opacity: 0.26,
+      opacity: 0.34,
       fade: 60,
       colorKey: 'low',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.01,
+      speed: wisp(0.01),
     },
     {
       seed: 421,
@@ -488,11 +499,11 @@ function SceneClouds({
       position: [300, 195, -200],
       volume: 15,
       smallestVolume: 4,
-      opacity: 0.22,
+      opacity: 0.3,
       fade: 55,
       colorKey: 'low',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.011,
+      speed: wisp(0.011),
     },
     {
       seed: 430,
@@ -501,11 +512,11 @@ function SceneClouds({
       position: [1600, 175, -220],
       volume: 18,
       smallestVolume: 4,
-      opacity: 0.26,
+      opacity: 0.34,
       fade: 60,
       colorKey: 'low',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.01,
+      speed: wisp(0.01),
     },
     {
       seed: 431,
@@ -514,15 +525,125 @@ function SceneClouds({
       position: [1200, 165, 500],
       volume: 15,
       smallestVolume: 4,
-      opacity: 0.22,
+      opacity: 0.3,
       fade: 55,
       colorKey: 'low',
       concentrate: 'random',
-      speed: reducedMotion ? 0 : 0.01,
+      speed: wisp(0.01),
+    },
+  ]
+
+  // Soft banks along the camera path — you fly through these mid-exploration
+  const mistDefs: CloudDef[] = [
+    {
+      seed: 501,
+      segments: 14,
+      bounds: [420, 90, 280],
+      position: [-900, 130, 820],
+      volume: 55,
+      smallestVolume: 12,
+      opacity: 0.55,
+      fade: 45,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.004),
+    },
+    {
+      seed: 502,
+      segments: 13,
+      bounds: [380, 100, 260],
+      position: [-480, 125, 900],
+      volume: 50,
+      smallestVolume: 11,
+      opacity: 0.5,
+      fade: 40,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.0035),
+    },
+    {
+      seed: 503,
+      segments: 14,
+      bounds: [360, 110, 300],
+      position: [40, 220, 780],
+      volume: 58,
+      smallestVolume: 13,
+      opacity: 0.52,
+      fade: 42,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.004),
+    },
+    {
+      seed: 504,
+      segments: 13,
+      bounds: [400, 95, 240],
+      position: [620, 160, 700],
+      volume: 48,
+      smallestVolume: 11,
+      opacity: 0.48,
+      fade: 40,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.003),
+    },
+    {
+      seed: 505,
+      segments: 14,
+      bounds: [440, 105, 320],
+      position: [520, 145, -40],
+      volume: 56,
+      smallestVolume: 12,
+      opacity: 0.5,
+      fade: 38,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.0035),
+    },
+    {
+      seed: 506,
+      segments: 13,
+      bounds: [360, 90, 260],
+      position: [980, 110, 820],
+      volume: 46,
+      smallestVolume: 10,
+      opacity: 0.46,
+      fade: 40,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.004),
+    },
+    {
+      seed: 507,
+      segments: 14,
+      bounds: [400, 100, 280],
+      position: [1800, 140, -180],
+      volume: 52,
+      smallestVolume: 12,
+      opacity: 0.5,
+      fade: 42,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.003),
+    },
+    {
+      seed: 508,
+      segments: 13,
+      bounds: [380, 95, 250],
+      position: [1500, 145, -620],
+      volume: 48,
+      smallestVolume: 11,
+      opacity: 0.48,
+      fade: 40,
+      colorKey: 'mist',
+      concentrate: 'inside',
+      speed: wisp(0.0035),
     },
   ]
 
   const selected = defs.slice(0, maxCount)
+  const mistCount = Math.max(3, Math.min(mistDefs.length, Math.ceil(maxCount * 0.55)))
+  const mist = mistDefs.slice(0, mistCount)
   const drifting = selected.filter((d) => d.drift)
   const staticClouds = selected.filter((d) => !d.drift)
 
@@ -544,14 +665,24 @@ function SceneClouds({
   )
 
   return (
-    <Clouds material={CloudMaterial} limit={limit} range={55} frustumCulled={false}>
-      {drifting.length > 0 ? (
-        <Drift speed={drift} reducedMotion={reducedMotion}>
-          {drifting.map(renderCloud)}
-        </Drift>
-      ) : null}
-      {staticClouds.map(renderCloud)}
-    </Clouds>
+    <>
+      <Clouds material={CloudMaterial} limit={limit} range={55} frustumCulled={false}>
+        {drifting.length > 0 ? (
+          <Drift speed={drift} reducedMotion={reducedMotion}>
+            {drifting.map(renderCloud)}
+          </Drift>
+        ) : null}
+        {staticClouds.map(renderCloud)}
+      </Clouds>
+      <Clouds
+        material={CloudMaterial}
+        limit={Math.max(40, mistCount * 14)}
+        range={40}
+        frustumCulled={false}
+      >
+        {mist.map(renderCloud)}
+      </Clouds>
+    </>
   )
 }
 
@@ -603,6 +734,7 @@ export function Atmosphere({
         limit={quality.cloudLimit}
         maxCount={quality.cloudMaxCount}
         segmentsCap={quality.cloudSegments}
+        animateClouds={quality.tier !== 'low'}
       />
     </>
   )

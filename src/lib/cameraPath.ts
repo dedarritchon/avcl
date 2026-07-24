@@ -1,52 +1,57 @@
 import * as THREE from 'three'
 
-type Keyframe = {
+export type CameraKeyframe = {
   t: number
   position: [number, number, number]
   lookAt: [number, number, number]
 }
 
 /** Path from ?edit=1 — −X west / +X east / −Z north / +Z south */
-const KEYFRAMES: Keyframe[] = [
+export const CAMERA_PATH_KEYFRAMES: CameraKeyframe[] = [
   {
-    t: 0.0,
+    t: 0.00,
     position: [-1041, 124, 790],
     lookAt: [-871, 135, 651],
   },
   {
-    t: 0.14,
+    t: 0.13,
     position: [-526, 121, 951],
     lookAt: [-480, 106, 737],
   },
   {
-    t: 0.29,
+    t: 0.25,
     position: [-4, 256, 859],
     lookAt: [109, 231, 672],
   },
   {
-    t: 0.43,
+    t: 0.38,
     position: [651, 173, 756],
     lookAt: [647, 172, 717],
   },
   {
-    t: 0.57,
-    position: [500, 151, -69],
-    lookAt: [511, 158, -288],
+    t: 0.50,
+    position: [512, 141, 48],
+    lookAt: [520, 149, -172],
   },
   {
-    t: 0.71,
+    t: 0.63,
+    position: [802, 179, 554],
+    lookAt: [706, 169, 356],
+  },
+  {
+    t: 0.75,
     position: [1022, 102, 879],
     lookAt: [1007, 103, 659],
   },
   {
-    t: 0.86,
-    position: [1982, 151, -216],
-    lookAt: [1782, 199, -295],
+    t: 0.88,
+    position: [1984, 151, -221],
+    lookAt: [1775, 170, -289],
   },
   {
-    t: 1.0,
-    position: [1536, 155, -677],
-    lookAt: [1318, 151, -699],
+    t: 1.00,
+    position: [1654, 157, -665],
+    lookAt: [1435, 153, -687],
   },
 ]
 
@@ -79,11 +84,11 @@ function smoothstep(u: number) {
   return t * t * (3 - 2 * t)
 }
 
-function getKeyframe(i: number): Keyframe {
-  const n = KEYFRAMES.length
-  if (i < 0) return KEYFRAMES[0]
-  if (i >= n) return KEYFRAMES[n - 1]
-  return KEYFRAMES[i]
+function getKeyframe(i: number): CameraKeyframe {
+  const n = CAMERA_PATH_KEYFRAMES.length
+  if (i < 0) return CAMERA_PATH_KEYFRAMES[0]
+  if (i >= n) return CAMERA_PATH_KEYFRAMES[n - 1]
+  return CAMERA_PATH_KEYFRAMES[i]
 }
 
 function sampleSpline(
@@ -127,10 +132,10 @@ function slerpDir(a: THREE.Vector3, b: THREE.Vector3, u: number, out: THREE.Vect
 export function sampleCameraPath(progress: number) {
   const t = Math.min(1, Math.max(0, progress))
   let i = 0
-  while (i < KEYFRAMES.length - 2 && t > KEYFRAMES[i + 1].t) i += 1
+  while (i < CAMERA_PATH_KEYFRAMES.length - 2 && t > CAMERA_PATH_KEYFRAMES[i + 1].t) i += 1
 
-  const a = KEYFRAMES[i]
-  const b = KEYFRAMES[i + 1]
+  const a = CAMERA_PATH_KEYFRAMES[i]
+  const b = CAMERA_PATH_KEYFRAMES[i + 1]
   const local = smoothstep((t - a.t) / Math.max(1e-6, b.t - a.t))
 
   sampleSpline(i, local, 'position', _pos)
@@ -154,3 +159,34 @@ export function sampleCameraPath(progress: number) {
     lookAt: _look.clone(),
   }
 }
+
+/** Zoomed-in start for the automatic intro (dolly in along the first view ray). */
+export function introStartView() {
+  const first = CAMERA_PATH_KEYFRAMES[0]
+  const px = first.position[0]
+  const py = first.position[1]
+  const pz = first.position[2]
+  const lx = first.lookAt[0]
+  const ly = first.lookAt[1]
+  const lz = first.lookAt[2]
+  // Move toward lookAt on the same ray → pitch stays locked to the horizon
+  const k = 0.78
+  return {
+    position: [
+      px + (lx - px) * k,
+      py + (ly - py) * k,
+      pz + (lz - pz) * k,
+    ] as [number, number, number],
+    lookAt: [lx, ly, lz] as [number, number, number],
+  }
+}
+
+export function introEndView() {
+  const first = CAMERA_PATH_KEYFRAMES[0]
+  return {
+    position: [...first.position] as [number, number, number],
+    lookAt: [...first.lookAt] as [number, number, number],
+  }
+}
+
+export const INTRO_DURATION_SEC = 3.6

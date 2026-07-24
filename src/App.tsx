@@ -7,6 +7,7 @@ import { ScrollNarrative } from './components/ScrollNarrative'
 import { Loader } from './components/Loader'
 import type { EditorWaypoint } from './components/PathEditor'
 import { useScrollProgress } from './hooks/useScrollProgress'
+import { useViewportCover } from './hooks/useViewportCover'
 import { useLocale } from './hooks/useLocale'
 import { useTheme } from './hooks/useTheme'
 import {
@@ -15,6 +16,7 @@ import {
   QualityProvider,
   QualityFpsProbe,
 } from './hooks/useQuality'
+import { introStartView } from './lib/cameraPath'
 import { makeSkyTexture, themeSky } from './lib/theme'
 
 const PathEditorPanel = lazy(() =>
@@ -55,10 +57,14 @@ function AppShell() {
   const quality = useQuality()
   const reportFps = useReportFps()
   const [ready, setReady] = useState(false)
+  const [introDone, setIntroDone] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
   const editMode = useEditMode()
+  // Intro runs from first paint (zoomed-in) so CameraRig never settles on path[0] early
+  const introActive = !introDone && !editMode
   const [waypoints, setWaypoints] = useState<EditorWaypoint[]>(loadWaypoints)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const canvasWrapRef = useRef<HTMLDivElement>(null)
   const viewApiRef = useRef<{
     getView: () => {
       position: [number, number, number]
@@ -69,6 +75,31 @@ function AppShell() {
       lookAt: [number, number, number],
     ) => void
   } | null>(null)
+
+  useViewportCover(canvasWrapRef)
+
+  // Always start at the top (no restore to Contacto / hash jump)
+  useEffect(() => {
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+    window.scrollTo(0, 0)
+  }, [])
+
+  useEffect(() => {
+    if (editMode || introDone) {
+      document.documentElement.classList.remove('intro-lock')
+      document.body.classList.remove('intro-lock')
+      return
+    }
+    document.documentElement.classList.add('intro-lock')
+    document.body.classList.add('intro-lock')
+    window.scrollTo(0, 0)
+    return () => {
+      document.documentElement.classList.remove('intro-lock')
+      document.body.classList.remove('intro-lock')
+    }
+  }, [editMode, introDone])
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -98,13 +129,14 @@ function AppShell() {
 
   return (
     <div className={`app${editMode ? ' app--edit' : ''}`} data-theme={theme}>
-      <div className="canvas-wrap" aria-hidden={!ready}>
+      <div className="canvas-wrap" ref={canvasWrapRef} aria-hidden={!ready}>
         <Canvas
           dpr={[1, quality.dprMax]}
           frameloop="demand"
           gl={{
             antialias: quality.antialias,
-            alpha: true,
+            // Opaque — transparent GL shows browser white during mobile chrome resize
+            alpha: false,
             powerPreference: 'high-performance',
             stencil: false,
             depth: true,
@@ -113,7 +145,7 @@ function AppShell() {
             fov: 48,
             near: 1,
             far: quality.cameraFar,
-            position: [-1041, 124, 790],
+            position: introStartView().position,
           }}
           performance={{ min: 0.5 }}
           onCreated={({ gl, scene }) => {
@@ -126,7 +158,7 @@ function AppShell() {
             invalidate()
           }}
         >
-          <AdaptiveDpr pixelated />
+          <AdaptiveDpr />
           <AdaptiveEvents />
           <QualityFpsProbe onReport={reportFps} />
           <Suspense fallback={null}>
@@ -135,7 +167,17 @@ function AppShell() {
               reducedMotion={reducedMotion}
               theme={theme}
               quality={quality}
-              onReady={() => setReady(true)}
+              onReady={() => {
+                setReady(true)
+                invalidate()
+              }}
+              introActive={introActive}
+              introPaused={!ready}
+              onIntroComplete={() => {
+                window.scrollTo(0, 0)
+                setIntroDone(true)
+                invalidate()
+              }}
               editMode={editMode}
               waypoints={waypoints}
               onWaypointsChange={setWaypoints}
@@ -167,6 +209,7 @@ function AppShell() {
           onLocaleChange={setLocale}
           theme={theme}
           onThemeChange={setTheme}
+          revealed={introDone && ready}
         />
       )}
     </div>

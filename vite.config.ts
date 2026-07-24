@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // GitHub project Pages: https://<user>.github.io/varela/
 // Override with: vite build --base=/your-repo/
 export default defineConfig({
-  base: process.env.GITHUB_PAGES === 'true' ? '/varela/' : '/',
+  base: process.env.GITHUB_PAGES === 'true' ? '/avcl/' : '/',
   plugins: [react()],
   assetsInclude: ['**/*.glb'],
   build: {

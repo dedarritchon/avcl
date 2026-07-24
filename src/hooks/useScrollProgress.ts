@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { remapScrollProgress } from '../lib/scrollBeats'
 
 const UI_HZ = 12
 const UI_MS = 1000 / UI_HZ
 
-function readProgress() {
+function readRaw() {
   const max = document.documentElement.scrollHeight - window.innerHeight
   return max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0
 }
@@ -27,7 +28,8 @@ export function useScrollProgress(onInvalidate?: () => void): {
     let frame = 0
 
     const update = () => {
-      const next = readProgress()
+      const raw = readRaw()
+      const next = remapScrollProgress(raw)
       progressRef.current = next
       invalidateRef.current?.()
 
@@ -47,10 +49,15 @@ export function useScrollProgress(onInvalidate?: () => void): {
     setProgress(progressRef.current)
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', onScroll)
+    vv?.addEventListener('scroll', onScroll)
     return () => {
       cancelAnimationFrame(frame)
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
+      vv?.removeEventListener('resize', onScroll)
+      vv?.removeEventListener('scroll', onScroll)
     }
   }, [])
 

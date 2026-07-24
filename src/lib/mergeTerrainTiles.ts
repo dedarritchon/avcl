@@ -37,12 +37,14 @@ export function mergeTerrainTiles(root: THREE.Object3D, maxAnisotropy: number) {
 
     if (!material) {
       material = std
-      material.envMapIntensity = 0.75
-      material.roughness = 0.96
-      material.metalness = 0
+      material.envMapIntensity = 0.95
+      material.roughness = 0.88
+      material.metalness = 0.02
       material.side = THREE.FrontSide
       material.flatShading = false
       material.fog = true
+      // Slight lift — satellite albedo is often underexposed vs ground photos
+      material.color.set('#f2f4f6')
       if (material.map) configureTerrainMap(material.map, maxAnisotropy)
       applyMutePeakWaterShader(material)
     }

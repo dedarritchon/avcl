@@ -1,9 +1,27 @@
+import { useRef } from 'react'
 import { useProgress } from '@react-three/drei'
 import { copy, type Locale } from '../lib/locale'
 
+/** Survives StrictMode remounts — drei progress resets between asset batches. */
+let loaderPeak = 0
+
 export function Loader({ visible, locale }: { visible: boolean; locale: Locale }) {
   const { progress } = useProgress()
-  const value = visible ? Math.min(100, Math.max(0, progress)) : 100
+  const wasVisible = useRef(visible)
+
+  // New load session (e.g. hard remount) — allow a fresh climb
+  if (visible && !wasVisible.current) {
+    loaderPeak = 0
+  }
+  wasVisible.current = visible
+
+  if (visible) {
+    const next = Math.min(100, Math.max(0, Number.isFinite(progress) ? progress : 0))
+    loaderPeak = Math.max(loaderPeak, next)
+  }
+
+  // Hold just under 100 until the scene actually dismisses the overlay
+  const value = visible ? Math.min(loaderPeak, 96) : 100
 
   return (
     <div

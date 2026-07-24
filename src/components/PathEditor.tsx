@@ -3,6 +3,10 @@ import { invalidate, useFrame, useThree } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { sampleHeight } from '../lib/heightmap'
+import {
+  CAMERA_PATH_KEYFRAMES,
+  type CameraKeyframe,
+} from '../lib/cameraPath'
 
 export type EditorWaypoint = {
   id: string
@@ -26,10 +30,12 @@ function Markers({
   waypoints,
   selectedId,
   onSelect,
+  onFlyTo,
 }: {
   waypoints: EditorWaypoint[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onFlyTo: (wp: EditorWaypoint) => void
 }) {
   return (
     <group>
@@ -42,6 +48,7 @@ function Markers({
               onClick={(e) => {
                 e.stopPropagation()
                 onSelect(wp.id)
+                onFlyTo(wp)
               }}
             >
               <sphereGeometry args={[selected ? 18 : 12, 16, 16]} />
@@ -237,6 +244,17 @@ export function PathEditorScene({ waypoints, onChange, selectedId, onSelect }: P
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
   const pointer = useMemo(() => new THREE.Vector2(), [])
 
+  const flyTo = useCallback(
+    (wp: EditorWaypoint) => {
+      camera.position.set(...wp.position)
+      camera.lookAt(wp.lookAt[0], wp.lookAt[1], wp.lookAt[2])
+      camera.rotation.order = 'YXZ'
+      window.dispatchEvent(new Event('path-editor-goto'))
+      invalidate()
+    },
+    [camera],
+  )
+
   // Double-click terrain: set look-at of selected waypoint (or face that point)
   const onPointerDown = useCallback(
     (event: PointerEvent) => {
@@ -276,7 +294,12 @@ export function PathEditorScene({ waypoints, onChange, selectedId, onSelect }: P
   return (
     <>
       <FreeFlyControls />
-      <Markers waypoints={waypoints} selectedId={selectedId} onSelect={onSelect} />
+      <Markers
+        waypoints={waypoints}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        onFlyTo={flyTo}
+      />
     </>
   )
 }
@@ -292,6 +315,55 @@ type PanelProps = {
 
 const GROUND_EYE = 8
 
+function keyframesToWaypoints(frames: CameraKeyframe[]): EditorWaypoint[] {
+  return frames.map((kf) => ({
+    id: crypto.randomUUID(),
+    position: [...kf.position] as [number, number, number],
+    lookAt: [...kf.lookAt] as [number, number, number],
+  }))
+}
+
+/** Accepts exported `const KEYFRAMES = [...]` or a bare `[...]` array. */
+function parseKeyframesPaste(raw: string): CameraKeyframe[] | null {
+  const text = raw.trim()
+  if (!text) return null
+  try {
+    const start = text.indexOf('[')
+    const end = text.lastIndexOf(']')
+    if (start < 0 || end <= start) return null
+    const jsonish = text
+      .slice(start, end + 1)
+      .replace(/(\w+)\s*:/g, '"$1":')
+      .replace(/,\s*([\]}])/g, '$1')
+    const parsed = JSON.parse(jsonish) as unknown
+    if (!Array.isArray(parsed) || parsed.length === 0) return null
+    const frames: CameraKeyframe[] = []
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') return null
+      const { t, position, lookAt } = item as Record<string, unknown>
+      if (
+        typeof t !== 'number' ||
+        !Array.isArray(position) ||
+        !Array.isArray(lookAt) ||
+        position.length !== 3 ||
+        lookAt.length !== 3 ||
+        !position.every((v) => typeof v === 'number') ||
+        !lookAt.every((v) => typeof v === 'number')
+      ) {
+        return null
+      }
+      frames.push({
+        t,
+        position: position as [number, number, number],
+        lookAt: lookAt as [number, number, number],
+      })
+    }
+    return frames
+  } catch {
+    return null
+  }
+}
+
 export function PathEditorPanel({
   waypoints,
   selectedId,
@@ -301,6 +373,9 @@ export function PathEditorPanel({
   goToView,
 }: PanelProps) {
   const [copied, setCopied] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
 
   const makeWaypoint = (): EditorWaypoint | null => {
     const view = getView()
@@ -388,6 +463,40 @@ export function PathEditorPanel({
     })
   }
 
+  const applyKeyframes = (frames: CameraKeyframe[]) => {
+    const next = keyframesToWaypoints(frames)
+    onChange(next)
+    onSelect(next[0]?.id ?? null)
+    setImportError(null)
+    setImportText('')
+    setImportOpen(false)
+  }
+
+  const loadShippedPath = () => {
+    if (
+      waypoints.length > 0 &&
+      !window.confirm('Replace current waypoints with the shipped cameraPath?')
+    ) {
+      return
+    }
+    applyKeyframes(CAMERA_PATH_KEYFRAMES)
+  }
+
+  const importPaste = () => {
+    const frames = parseKeyframesPaste(importText)
+    if (!frames) {
+      setImportError('Could not parse KEYFRAMES — paste the exported array.')
+      return
+    }
+    if (
+      waypoints.length > 0 &&
+      !window.confirm(`Replace current waypoints with ${frames.length} imported points?`)
+    ) {
+      return
+    }
+    applyKeyframes(frames)
+  }
+
   return (
     <aside className="path-editor">
       <header className="path-editor__head">
@@ -437,7 +546,39 @@ export function PathEditorPanel({
         >
           {copied ? 'Copied!' : 'Copy KEYFRAMES'}
         </button>
+        <button type="button" className="path-editor__import" onClick={loadShippedPath}>
+          Load shipped cameraPath
+        </button>
+        <button
+          type="button"
+          className="path-editor__import"
+          onClick={() => {
+            setImportOpen((v) => !v)
+            setImportError(null)
+          }}
+        >
+          {importOpen ? 'Hide paste import' : 'Paste KEYFRAMES…'}
+        </button>
       </div>
+
+      {importOpen ? (
+        <div className="path-editor__paste">
+          <textarea
+            value={importText}
+            onChange={(e) => {
+              setImportText(e.target.value)
+              setImportError(null)
+            }}
+            placeholder="Paste const KEYFRAMES = [ ... ] here"
+            rows={7}
+            spellCheck={false}
+          />
+          {importError ? <p className="path-editor__paste-error">{importError}</p> : null}
+          <button type="button" onClick={importPaste} disabled={!importText.trim()}>
+            Import pasted path
+          </button>
+        </div>
+      ) : null}
 
       <ol className="path-editor__list">
         {waypoints.length === 0 ? (
@@ -448,7 +589,10 @@ export function PathEditorPanel({
               <button
                 type="button"
                 className={w.id === selectedId ? 'is-selected' : undefined}
-                onClick={() => onSelect(w.id)}
+                onClick={() => {
+                  onSelect(w.id)
+                  goToView(w.position, w.lookAt)
+                }}
               >
                 <strong>#{i + 1}</strong>
                 <span>
@@ -481,8 +625,9 @@ export function PathEditorPanel({
       </ol>
 
       <p className="path-editor__hint">
-        Open with <code>?edit=1</code> · paste exported keyframes into{' '}
-        <code>src/lib/cameraPath.ts</code>
+        Open with <code>?edit=1</code> · <strong>Load shipped cameraPath</strong> restores{' '}
+        <code>src/lib/cameraPath.ts</code> if localStorage was cleared · Copy / Paste KEYFRAMES to
+        sync edits.
       </p>
     </aside>
   )
