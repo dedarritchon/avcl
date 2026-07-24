@@ -112,6 +112,14 @@ html.intro-lock body {
   touch-action: none;
 }
 
+/* Lock scroll while in free bird POV */
+html.birds-view-lock,
+html.birds-view-lock body {
+  overflow: hidden;
+  height: 100%;
+  touch-action: none;
+}
+
 .app {
   position: relative;
   min-height: 100%;
@@ -283,6 +291,60 @@ html.intro-lock body {
 .lang-toggle__sep {
   color: rgba(16, 32, 40, 0.35);
   font-size: 0.7rem;
+}
+
+.birds-toggle {
+  appearance: none;
+  margin: 0;
+  pointer-events: auto;
+  padding: 0.35rem 0.7rem;
+  background: linear-gradient(160deg, var(--paper-strong), var(--paper));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(12, 28, 36, 0.12);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.birds-toggle:hover,
+.birds-toggle:focus-visible,
+.birds-toggle.is-active {
+  color: var(--ink);
+  outline: none;
+}
+
+.birds-hud {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.birds-hud__hint {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(1.1rem, 3vw, 1.8rem);
+  transform: translateX(-50%);
+  z-index: 6;
+  margin: 0;
+  padding: 0.45rem 0.85rem;
+  max-width: min(92vw, 28rem);
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: linear-gradient(160deg, var(--paper-strong), var(--paper));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(12, 28, 36, 0.12);
+  pointer-events: none;
 }
 
 /* Scroll length only — captions are fixed overlays */
@@ -743,6 +805,62 @@ html.intro-lock body {
 
   .caption--finale {
     top: clamp(5rem, 14vh, 18vh);
+  }
+
+  /* Tight mist — hug the copy, don’t fog the whole viewport */
+  .caption-mist {
+    inset: -1.6rem -1.8rem -1.8rem;
+  }
+
+  .caption--hero .caption-mist {
+    inset: -2rem -2.2rem -2.2rem;
+  }
+
+  .caption--grey .caption-mist,
+  .caption--walk .caption-mist,
+  .caption--massif .caption-mist,
+  .caption--contact .caption-mist {
+    inset: -1.5rem -1.7rem -1.7rem;
+  }
+
+  .caption-mist__puff {
+    filter: blur(14px) !important;
+    opacity: 0.72 !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  .caption-mist__puff:nth-child(n + 4) {
+    display: none;
+  }
+
+  .caption-mist__puff:nth-child(1) {
+    left: 0;
+    top: 6%;
+    width: 100%;
+    height: 88%;
+  }
+
+  .caption-mist__puff:nth-child(2) {
+    left: 8%;
+    top: 0;
+    width: 84%;
+    height: 70%;
+    opacity: 0.55 !important;
+  }
+
+  .caption-mist__puff:nth-child(3) {
+    left: 4%;
+    top: 28%;
+    width: 92%;
+    height: 62%;
+    opacity: 0.5 !important;
+  }
+
+  .caption--hero .caption-mist__puff:nth-child(1),
+  .caption--hero .caption-mist__puff:nth-child(3) {
+    width: 100%;
+    filter: blur(16px) !important;
   }
 }
 

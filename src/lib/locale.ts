@@ -24,6 +24,10 @@ type Copy = {
   themeToggle: string
   themeLight: string
   themeDark: string
+  birdsViewEnter: string
+  birdsViewExit: string
+  birdsViewHint: string
+  birdsViewHintMobile: string
 }
 
 export const copy: Record<Locale, Copy> = {
@@ -72,6 +76,10 @@ export const copy: Record<Locale, Copy> = {
     themeToggle: 'Tema',
     themeLight: 'Día',
     themeDark: 'Noche',
+    birdsViewEnter: 'Vuelo',
+    birdsViewExit: 'Salir del vuelo',
+    birdsViewHint: '← → dirección · ↑ ↓ inclinación · Esc salir',
+    birdsViewHintMobile: 'Desliza para dirigir · toca Salir para volver',
   },
   en: {
     sections: [
@@ -118,6 +126,10 @@ export const copy: Record<Locale, Copy> = {
     themeToggle: 'Theme',
     themeLight: 'Day',
     themeDark: 'Night',
+    birdsViewEnter: 'Bird view',
+    birdsViewExit: 'Exit flight',
+    birdsViewHint: '← → turn · ↑ ↓ pitch · Esc to leave',
+    birdsViewHintMobile: 'Swipe to steer · tap Exit to leave',
   },
 }
 

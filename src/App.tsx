@@ -4,6 +4,7 @@ import { AdaptiveDpr, AdaptiveEvents } from '@react-three/drei'
 import * as THREE from 'three'
 import { TerrainExperience } from './components/TerrainExperience'
 import { ScrollNarrative } from './components/ScrollNarrative'
+import { BirdsViewHud } from './components/BirdsViewHud'
 import { Loader } from './components/Loader'
 import type { EditorWaypoint } from './components/PathEditor'
 import { useScrollProgress } from './hooks/useScrollProgress'
@@ -58,10 +59,12 @@ function AppShell() {
   const reportFps = useReportFps()
   const [ready, setReady] = useState(false)
   const [introDone, setIntroDone] = useState(false)
+  const [birdsView, setBirdsView] = useState(false)
+  const [birdsViewStart, setBirdsViewStart] = useState(0)
   const [reducedMotion, setReducedMotion] = useState(false)
   const editMode = useEditMode()
   // Intro runs from first paint (zoomed-in) so CameraRig never settles on path[0] early
-  const introActive = !introDone && !editMode
+  const introActive = !introDone && !editMode && !birdsView
   const [waypoints, setWaypoints] = useState<EditorWaypoint[]>(loadWaypoints)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const canvasWrapRef = useRef<HTMLDivElement>(null)
@@ -78,6 +81,17 @@ function AppShell() {
 
   useViewportCover(canvasWrapRef)
 
+  const enterBirdsView = useCallback(() => {
+    setBirdsViewStart(progressRef.current)
+    setBirdsView(true)
+    invalidate()
+  }, [progressRef])
+
+  const exitBirdsView = useCallback(() => {
+    setBirdsView(false)
+    invalidate()
+  }, [])
+
   // Always start at the top (no restore to Contacto / hash jump)
   useEffect(() => {
     if (window.location.hash) {
@@ -87,19 +101,39 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
-    if (editMode || introDone) {
+    if (editMode || introDone || birdsView) {
       document.documentElement.classList.remove('intro-lock')
       document.body.classList.remove('intro-lock')
-      return
+    } else {
+      document.documentElement.classList.add('intro-lock')
+      document.body.classList.add('intro-lock')
+      window.scrollTo(0, 0)
     }
-    document.documentElement.classList.add('intro-lock')
-    document.body.classList.add('intro-lock')
-    window.scrollTo(0, 0)
+
+    if (birdsView) {
+      document.documentElement.classList.add('birds-view-lock')
+      document.body.classList.add('birds-view-lock')
+    } else {
+      document.documentElement.classList.remove('birds-view-lock')
+      document.body.classList.remove('birds-view-lock')
+    }
+
     return () => {
       document.documentElement.classList.remove('intro-lock')
       document.body.classList.remove('intro-lock')
+      document.documentElement.classList.remove('birds-view-lock')
+      document.body.classList.remove('birds-view-lock')
     }
-  }, [editMode, introDone])
+  }, [editMode, introDone, birdsView])
+
+  useEffect(() => {
+    if (!birdsView) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape') exitBirdsView()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [birdsView, exitBirdsView])
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -116,7 +150,7 @@ function AppShell() {
 
   useEffect(() => {
     invalidate()
-  }, [theme, editMode, quality.tier])
+  }, [theme, editMode, birdsView, quality.tier])
 
   const getView = useCallback(() => viewApiRef.current?.getView() ?? null, [])
   const goToView = useCallback(
@@ -128,7 +162,10 @@ function AppShell() {
   )
 
   return (
-    <div className={`app${editMode ? ' app--edit' : ''}`} data-theme={theme}>
+    <div
+      className={`app${editMode ? ' app--edit' : ''}${birdsView ? ' app--birds' : ''}`}
+      data-theme={theme}
+    >
       <div className="canvas-wrap" ref={canvasWrapRef} aria-hidden={!ready}>
         <Canvas
           dpr={[1, quality.dprMax]}
@@ -179,6 +216,8 @@ function AppShell() {
                 invalidate()
               }}
               editMode={editMode}
+              birdsView={birdsView}
+              birdsViewStartProgress={birdsViewStart}
               waypoints={waypoints}
               onWaypointsChange={setWaypoints}
               selectedId={selectedId}
@@ -202,6 +241,14 @@ function AppShell() {
             goToView={goToView}
           />
         </Suspense>
+      ) : birdsView ? (
+        <BirdsViewHud
+          locale={locale}
+          onLocaleChange={setLocale}
+          theme={theme}
+          onThemeChange={setTheme}
+          onExit={exitBirdsView}
+        />
       ) : (
         <ScrollNarrative
           progress={progress}
@@ -210,6 +257,8 @@ function AppShell() {
           theme={theme}
           onThemeChange={setTheme}
           revealed={introDone && ready}
+          onEnterBirdsView={enterBirdsView}
+          birdsViewAvailable={introDone && ready}
         />
       )}
     </div>

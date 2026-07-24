@@ -52,9 +52,10 @@ function bakeNamedTemplate(scene: THREE.Object3D, name: string): TemplatePart[] 
         std.map.anisotropy = 4
         std.map.colorSpace = THREE.SRGBColorSpace
       }
-      // Leaf cards often need alpha
+      // Cutout leaves — keep opaque (alphaTest only). transparent:true put the
+      // InstancedMesh in the transparent queue with valley mist, so trees drew on top.
       if (std.map && (std.transparent || std.alphaTest > 0 || name.includes('grass') || name.includes('branch'))) {
-        std.transparent = true
+        std.transparent = false
         std.alphaTest = Math.max(std.alphaTest, 0.35)
         std.depthWrite = true
       }

@@ -15,6 +15,8 @@ type Props = {
   onThemeChange: (theme: Theme) => void
   /** False during automatic camera intro — hero appears when true */
   revealed?: boolean
+  onEnterBirdsView?: () => void
+  birdsViewAvailable?: boolean
 }
 
 function IconMail() {
@@ -66,6 +68,8 @@ export function ScrollNarrative({
   theme,
   onThemeChange,
   revealed = true,
+  onEnterBirdsView,
+  birdsViewAvailable = false,
 }: Props) {
   const t = copy[locale]
   const finaleOpacity = beatOpacity(progress, 'finale')
@@ -116,6 +120,16 @@ export function ScrollNarrative({
             {t.themeDark}
           </button>
         </div>
+
+        {birdsViewAvailable && onEnterBirdsView ? (
+          <button
+            type="button"
+            className="birds-toggle"
+            onClick={onEnterBirdsView}
+          >
+            {t.birdsViewEnter}
+          </button>
+        ) : null}
       </div>
 
       {/* Scroll length only — camera + captions are driven by remapped progress */}

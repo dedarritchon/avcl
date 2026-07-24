@@ -1,6 +1,7 @@
 import { useMemo, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Billboard, Cloud, Clouds, Environment, Stars } from '@react-three/drei'
+import { Billboard, Environment, Stars } from '@react-three/drei'
+import { Cloud, Clouds } from './HorizonClouds'
 import { requestAmbientInvalidate } from '../lib/ambientFrame'
 import * as THREE from 'three'
 import {
@@ -300,6 +301,7 @@ function SceneClouds({
   maxCount,
   segmentsCap,
   animateClouds,
+  cloudOpacity,
 }: {
   reducedMotion: boolean
   night: boolean
@@ -308,6 +310,7 @@ function SceneClouds({
   segmentsCap: number
   /** Noise/wisp animation — expensive; keep off on low tier */
   animateClouds: boolean
+  cloudOpacity: number
 }) {
   const drift = reducedMotion || !animateClouds ? 0 : night ? 0.08 : 0.2
   const wisp = (v: number) => (reducedMotion || !animateClouds ? 0 : v)
@@ -318,7 +321,7 @@ function SceneClouds({
     warm: night ? '#44566e' : '#ffffff',
     mist: night ? '#3a4860' : '#ffffff',
   }
-  const opacityScale = night ? 0.62 : 1
+  const opacityScale = (night ? 0.55 : 1) * cloudOpacity
 
   const defs: CloudDef[] = [
     {
@@ -686,6 +689,14 @@ function SceneClouds({
   )
 }
 
+function isMobileViewport() {
+  if (typeof window === 'undefined') return false
+  return (
+    window.matchMedia('(max-width: 900px)').matches ||
+    /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+  )
+}
+
 export function Atmosphere({
   reducedMotion,
   theme,
@@ -697,13 +708,17 @@ export function Atmosphere({
 }) {
   const night = theme === 'dark'
   const sky = themeSky[theme]
+  // Phones wash out with exp2 fog + portrait depth — cut hard
+  const mobileCut = isMobileViewport() ? 0.28 : 1
+  const fogDensity =
+    (night ? FOG_DENSITY_NIGHT : FOG_DENSITY) * quality.fogScale * mobileCut
 
   return (
     <>
       <fogExp2
-        key={theme}
+        key={`${theme}-${fogDensity.toFixed(6)}`}
         attach="fog"
-        args={[night ? FOG_COLOR_NIGHT : FOG_COLOR, night ? FOG_DENSITY_NIGHT : FOG_DENSITY]}
+        args={[night ? FOG_COLOR_NIGHT : FOG_COLOR, fogDensity]}
       />
 
       {quality.environment ? (
@@ -735,6 +750,7 @@ export function Atmosphere({
         maxCount={quality.cloudMaxCount}
         segmentsCap={quality.cloudSegments}
         animateClouds={quality.tier !== 'low'}
+        cloudOpacity={quality.cloudOpacity * (isMobileViewport() ? 0.45 : 1)}
       />
     </>
   )

@@ -14,6 +14,10 @@ export type QualitySettings = {
   antialias: boolean
   dprMax: number
   cameraFar: number
+  /** Multiplier on exp2 fog density (mobile tiers stay clearer) */
+  fogScale: number
+  /** Mist / cloud opacity multiplier */
+  cloudOpacity: number
 }
 
 const TIERS: Record<QualityTier, Omit<QualitySettings, 'tier'>> = {
@@ -30,6 +34,8 @@ const TIERS: Record<QualityTier, Omit<QualitySettings, 'tier'>> = {
     antialias: true,
     dprMax: 1.5,
     cameraFar: 6000,
+    fogScale: 1,
+    cloudOpacity: 1,
   },
   medium: {
     cloudLimit: 48,
@@ -44,6 +50,8 @@ const TIERS: Record<QualityTier, Omit<QualitySettings, 'tier'>> = {
     antialias: true,
     dprMax: 1,
     cameraFar: 4500,
+    fogScale: 0.35,
+    cloudOpacity: 0.5,
   },
   low: {
     cloudLimit: 24,
@@ -58,6 +66,8 @@ const TIERS: Record<QualityTier, Omit<QualitySettings, 'tier'>> = {
     antialias: false,
     dprMax: 1,
     cameraFar: 3000,
+    fogScale: 0.22,
+    cloudOpacity: 0.35,
   },
 }
 

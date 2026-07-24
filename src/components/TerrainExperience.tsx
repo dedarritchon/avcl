@@ -22,6 +22,9 @@ const Birds = lazy(() => import('./Birds').then((m) => ({ default: m.Birds })))
 const PathEditorScene = lazy(() =>
   import('./PathEditor').then((m) => ({ default: m.PathEditorScene })),
 )
+const BirdsViewRig = lazy(() =>
+  import('./BirdsView').then((m) => ({ default: m.BirdsViewRig })),
+)
 
 type Props = {
   progressRef: MutableRefObject<number>
@@ -35,6 +38,9 @@ type Props = {
   introPaused?: boolean
   onIntroComplete?: () => void
   editMode?: boolean
+  /** Free-fly bird POV — replaces scroll camera */
+  birdsView?: boolean
+  birdsViewStartProgress?: number
   waypoints?: EditorWaypoint[]
   onWaypointsChange?: (next: EditorWaypoint[]) => void
   selectedId?: string | null
@@ -366,6 +372,8 @@ export function TerrainExperience({
   introPaused = false,
   onIntroComplete,
   editMode = false,
+  birdsView = false,
+  birdsViewStartProgress = 0,
   waypoints = [],
   onWaypointsChange,
   selectedId = null,
@@ -383,7 +391,7 @@ export function TerrainExperience({
         theme={theme}
         quality={quality}
       />
-      {quality.birds > 0 ? (
+      {quality.birds > 0 && !birdsView ? (
         <Suspense fallback={null}>
           <Birds theme={theme} quality={quality} reducedMotion={reducedMotion} />
         </Suspense>
@@ -401,6 +409,14 @@ export function TerrainExperience({
             onSelect={onSelectWaypoint}
           />
           {viewApiRef ? <ViewApiBridge viewApiRef={viewApiRef} /> : null}
+        </Suspense>
+      ) : birdsView ? (
+        <Suspense fallback={null}>
+          <BirdsViewRig
+            key={birdsViewStartProgress}
+            startProgress={birdsViewStartProgress}
+            reducedMotion={reducedMotion}
+          />
         </Suspense>
       ) : (
         <CameraRig
